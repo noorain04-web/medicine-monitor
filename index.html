@@ -84,6 +84,7 @@
             font-size: 18px;
             color: #1a3b5c;
             flex: 1;
+            cursor: pointer;
         }
         .patient-name span {
             font-size: 14px;
@@ -91,14 +92,24 @@
             color: #6b7f94;
             margin-left: 8px;
         }
-        .delete-btn {
+        .item-actions {
+            display: flex;
+            gap: 2px;
+        }
+        .icon-btn {
             background: none;
             border: none;
-            font-size: 20px;
-            color: #b22234;
+            font-size: 18px;
             cursor: pointer;
             padding: 4px 8px;
             border-radius: 30px;
+            line-height: 1;
+        }
+        .icon-btn.edit {
+            color: #1e6f9f;
+        }
+        .icon-btn.delete {
+            color: #b22234;
         }
         .add-btn {
             background: #1e6f9f;
@@ -136,13 +147,9 @@
             font-size: 18px;
             color: #0b2b4a;
         }
-        .delete-med {
-            background: none;
-            border: none;
-            font-size: 18px;
-            color: #b22234;
-            cursor: pointer;
-            padding: 0 0 0 8px;
+        .med-actions {
+            display: flex;
+            gap: 2px;
         }
         .med-detail {
             font-size: 14px;
@@ -229,9 +236,6 @@
             padding: 40px 0;
             font-style: italic;
         }
-        .hidden {
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -253,22 +257,22 @@
         <button id="add-med-btn" class="add-btn">➕ Add Medicine</button>
     </div>
 
-    <!-- POPUP: Add Patient (Inline, simple) -->
-    <div id="popup-add-patient" class="screen" style="justify-content: center;">
-        <h2>New Patient</h2>
+    <!-- POPUP: Add/Edit Patient -->
+    <div id="popup-patient" class="screen" style="justify-content: center;">
+        <h2 id="patient-form-title">New Patient</h2>
         <div class="form-group">
             <label>Patient First Name</label>
-            <input type="text" id="new-patient-name" placeholder="e.g., Dad" autocomplete="off">
+            <input type="text" id="patient-name-input" placeholder="e.g., Dad" autocomplete="off">
         </div>
         <div class="btn-row">
-            <button id="cancel-add-patient" class="btn-secondary">Cancel</button>
+            <button id="cancel-patient" class="btn-secondary">Cancel</button>
             <button id="save-patient" class="btn-primary">Save</button>
         </div>
     </div>
 
-    <!-- POPUP: Add Medicine -->
-    <div id="popup-add-med" class="screen" style="justify-content: flex-start; padding-top: 10px;">
-        <h2>New Medicine</h2>
+    <!-- POPUP: Add/Edit Medicine -->
+    <div id="popup-med" class="screen" style="justify-content: flex-start; padding-top: 10px;">
+        <h2 id="med-form-title">New Medicine</h2>
         <div class="form-group">
             <label>Medicine Name</label>
             <input type="text" id="med-name" placeholder="e.g., Metformin 500mg" autocomplete="off">
@@ -278,15 +282,15 @@
             <input type="number" id="med-doses" value="2" min="0.5" step="0.5">
         </div>
         <div class="form-group">
-            <label>Remaining Quantity (as of today)</label>
+            <label>Remaining Quantity (as of the date below)</label>
             <input type="number" id="med-remaining" value="10" min="0" step="1">
         </div>
         <div class="form-group">
-            <label>Date Checked (last refill/count)</label>
+            <label>Date Checked (last refill / count)</label>
             <input type="date" id="med-date">
         </div>
         <div class="btn-row">
-            <button id="cancel-add-med" class="btn-secondary">Cancel</button>
+            <button id="cancel-med" class="btn-secondary">Cancel</button>
             <button id="save-med" class="btn-primary">Save</button>
         </div>
     </div>
@@ -297,12 +301,8 @@
         // --- Data Layer ---
         const STORAGE_KEY = 'mediTrackData';
 
-        // Initialize data structure
-        let appData = {
-            patients: []
-        };
+        let appData = { patients: [] };
 
-        // Load from localStorage
         function loadData() {
             const stored = localStorage.getItem(STORAGE_KEY);
             if (stored) {
@@ -313,7 +313,6 @@
                     appData = { patients: [] };
                 }
             } else {
-                // Seed with a sample patient for demo (optional)
                 appData = {
                     patients: [
                         { id: 'p1', name: 'Dad', medicines: [] },
@@ -322,7 +321,6 @@
                 };
                 saveData();
             }
-            // Ensure each patient has a medicines array
             appData.patients.forEach(p => { if (!p.medicines) p.medicines = []; });
         }
 
@@ -332,24 +330,28 @@
 
         // --- State ---
         let currentPatientId = null;
+        let editingPatientId = null;   // null = adding new
+        let editingMedicineId = null;  // null = adding new
 
         // --- DOM Elements ---
         const screenPatients = document.getElementById('screen-patients');
         const screenMeds = document.getElementById('screen-meds');
-        const popupAddPatient = document.getElementById('popup-add-patient');
-        const popupAddMed = document.getElementById('popup-add-med');
+        const popupPatient = document.getElementById('popup-patient');
+        const popupMed = document.getElementById('popup-med');
         const patientListContainer = document.getElementById('patient-list-container');
         const medListContainer = document.getElementById('med-list-container');
         const patientTitle = document.getElementById('patient-title');
-        const newPatientNameInput = document.getElementById('new-patient-name');
 
-        // Medicine form fields
+        const patientFormTitle = document.getElementById('patient-form-title');
+        const patientNameInput = document.getElementById('patient-name-input');
+
+        const medFormTitle = document.getElementById('med-form-title');
         const medNameInput = document.getElementById('med-name');
         const medDosesInput = document.getElementById('med-doses');
         const medRemainingInput = document.getElementById('med-remaining');
         const medDateInput = document.getElementById('med-date');
 
-        // --- Utility Functions ---
+        // --- Utilities ---
         function generateId() {
             return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
         }
@@ -363,34 +365,33 @@
             return date.toISOString().split('T')[0];
         }
 
-        // Calculate days remaining and end date based on doses
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         function calculateMedicineStats(med) {
             const doses = parseFloat(med.doses) || 0;
             const remaining = parseFloat(med.remaining) || 0;
             const lastChecked = med.lastChecked || formatDate(new Date());
 
-            if (doses <= 0) return { daysLeft: Infinity, endDate: null, isFinished: remaining <= 0 };
+            if (doses <= 0) {
+                return { daysLeft: Infinity, endDate: null, isFinished: remaining <= 0, rawRemaining: remaining };
+            }
 
-            // How many days the remaining stock will last
-            const daysLeft = Math.floor(remaining / doses); // integer days
+            const daysLeft = Math.floor(remaining / doses);
             const isFinished = remaining <= 0;
 
-            // Calculate end date (approx)
             const checkedDate = new Date(lastChecked);
             const endDate = new Date(checkedDate);
             endDate.setDate(endDate.getDate() + daysLeft);
 
-            return {
-                daysLeft: daysLeft,
-                endDate: endDate,
-                isFinished: isFinished,
-                rawRemaining: remaining,
-                rawDoses: doses
-            };
+            return { daysLeft, endDate, isFinished, rawRemaining: remaining };
         }
 
-        // --- Render Functions ---
-
+        // --- Render ---
         function renderPatients() {
             if (appData.patients.length === 0) {
                 patientListContainer.innerHTML = '<div class="empty-msg">No patients yet. Add one below.</div>';
@@ -401,28 +402,37 @@
                 const medCount = patient.medicines ? patient.medicines.length : 0;
                 return `
                     <div class="list-item" data-patient-id="${patient.id}">
-                        <div class="patient-name">${escapeHtml(patient.name)} <span>(${medCount})</span></div>
-                        <button class="delete-btn" data-patient-id="${patient.id}" title="Delete patient">✕</button>
+                        <div class="patient-name" data-patient-id="${patient.id}">
+                            ${escapeHtml(patient.name)} <span>(${medCount})</span>
+                        </div>
+                        <div class="item-actions">
+                            <button class="icon-btn edit" data-edit-patient="${patient.id}" title="Edit name">✏️</button>
+                            <button class="icon-btn delete" data-del-patient="${patient.id}" title="Delete patient">🗑️</button>
+                        </div>
                     </div>
                 `;
             }).join('');
 
-            // Attach click listeners to patient rows (excluding delete button)
-            document.querySelectorAll('.list-item[data-patient-id]').forEach(row => {
-                row.addEventListener('click', (e) => {
-                    // If clicked on delete button, ignore here (handled separately)
-                    if (e.target.classList.contains('delete-btn')) return;
-                    const pid = row.dataset.patientId;
-                    openPatientMeds(pid);
+            // Open patient's meds
+            document.querySelectorAll('.patient-name').forEach(el => {
+                el.addEventListener('click', () => {
+                    openPatientMeds(el.dataset.patientId);
                 });
             });
 
-            // Attach delete listeners
-            document.querySelectorAll('.delete-btn[data-patient-id]').forEach(btn => {
+            // Edit patient
+            document.querySelectorAll('[data-edit-patient]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const pid = btn.dataset.patientId;
-                    deletePatient(pid);
+                    openPatientForm(btn.dataset.editPatient);
+                });
+            });
+
+            // Delete patient
+            document.querySelectorAll('[data-del-patient]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deletePatient(btn.dataset.delPatient);
                 });
             });
         }
@@ -458,10 +468,13 @@
                 const lastCheckedStr = med.lastChecked || 'not set';
 
                 return `
-                    <div class="medicine-card" data-med-id="${med.id}">
+                    <div class="medicine-card">
                         <div class="med-header">
                             <div class="med-name">${escapeHtml(med.name)}</div>
-                            <button class="delete-med" data-med-id="${med.id}" data-patient-id="${patientId}">✕</button>
+                            <div class="med-actions">
+                                <button class="icon-btn edit" data-edit-med="${med.id}" data-patient-id="${patientId}" title="Edit medicine">✏️</button>
+                                <button class="icon-btn delete" data-del-med="${med.id}" data-patient-id="${patientId}" title="Delete medicine">🗑️</button>
+                            </div>
                         </div>
                         <div class="med-detail"><span>Doses/day:</span> <strong>${med.doses}</strong></div>
                         <div class="med-detail"><span>Remaining:</span> <strong>${med.remaining}</strong> (checked: ${lastCheckedStr})</div>
@@ -471,22 +484,128 @@
                 `;
             }).join('');
 
-            // Attach delete listeners for medicines
-            document.querySelectorAll('.delete-med').forEach(btn => {
+            // Edit medicine
+            document.querySelectorAll('[data-edit-med]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const medId = btn.dataset.medId;
-                    const pid = btn.dataset.patientId;
-                    deleteMedicine(pid, medId);
+                    openMedicineForm(btn.dataset.patientId, btn.dataset.editMed);
+                });
+            });
+
+            // Delete medicine
+            document.querySelectorAll('[data-del-med]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteMedicine(btn.dataset.patientId, btn.dataset.delMed);
                 });
             });
         }
 
-        // --- Actions ---
+        // --- Form open/close ---
+        function openPatientForm(patientId) {
+            editingPatientId = patientId || null;
 
+            if (editingPatientId) {
+                const p = appData.patients.find(pt => pt.id === editingPatientId);
+                patientFormTitle.textContent = 'Edit Patient';
+                patientNameInput.value = p ? p.name : '';
+            } else {
+                patientFormTitle.textContent = 'New Patient';
+                patientNameInput.value = '';
+            }
+            switchScreen(popupPatient);
+            patientNameInput.focus();
+        }
+
+        function openMedicineForm(patientId, medId) {
+            editingMedicineId = medId || null;
+            currentPatientId = patientId;
+
+            if (editingMedicineId) {
+                const patient = appData.patients.find(p => p.id === patientId);
+                const med = patient ? patient.medicines.find(m => m.id === medId) : null;
+                if (med) {
+                    medFormTitle.textContent = 'Edit Medicine';
+                    medNameInput.value = med.name;
+                    medDosesInput.value = med.doses;
+                    medRemainingInput.value = med.remaining;
+                    medDateInput.value = med.lastChecked || formatDate(new Date());
+                }
+            } else {
+                medFormTitle.textContent = 'New Medicine';
+                medNameInput.value = '';
+                medDosesInput.value = '2';
+                medRemainingInput.value = '10';
+                medDateInput.value = formatDate(new Date());
+            }
+            switchScreen(popupMed);
+            medNameInput.focus();
+        }
+
+        // --- Actions ---
         function openPatientMeds(patientId) {
             currentPatientId = patientId;
             renderMedicines(patientId);
+            switchScreen(screenMeds);
+        }
+
+        function savePatient() {
+            const name = patientNameInput.value.trim();
+            if (!name) return;
+
+            if (editingPatientId) {
+                // Update existing patient name
+                const p = appData.patients.find(pt => pt.id === editingPatientId);
+                if (p) p.name = name;
+            } else {
+                // Create new patient
+                appData.patients.push({
+                    id: generateId(),
+                    name: name,
+                    medicines: []
+                });
+            }
+            saveData();
+            editingPatientId = null;
+            renderPatients();
+            if (currentPatientId) renderMedicines(currentPatientId);
+            switchScreen(screenPatients);
+        }
+
+        function saveMedicine() {
+            const name = medNameInput.value.trim();
+            if (!name || !currentPatientId) return;
+
+            const patient = appData.patients.find(p => p.id === currentPatientId);
+            if (!patient) return;
+
+            const doses = parseFloat(medDosesInput.value) || 1;
+            const remaining = parseFloat(medRemainingInput.value) || 0;
+            const lastChecked = medDateInput.value || formatDate(new Date());
+
+            if (editingMedicineId) {
+                // Update existing medicine
+                const med = patient.medicines.find(m => m.id === editingMedicineId);
+                if (med) {
+                    med.name = name;
+                    med.doses = doses;
+                    med.remaining = remaining;
+                    med.lastChecked = lastChecked;
+                }
+            } else {
+                // Create new medicine
+                patient.medicines.push({
+                    id: generateId(),
+                    name: name,
+                    doses: doses,
+                    remaining: remaining,
+                    lastChecked: lastChecked
+                });
+            }
+
+            saveData();
+            editingMedicineId = null;
+            renderMedicines(currentPatientId);
             switchScreen(screenMeds);
         }
 
@@ -495,7 +614,6 @@
             appData.patients = appData.patients.filter(p => p.id !== patientId);
             saveData();
             renderPatients();
-            // If we were viewing this patient's meds, go back
             if (currentPatientId === patientId) {
                 currentPatientId = null;
                 switchScreen(screenPatients);
@@ -512,117 +630,60 @@
             }
         }
 
-        function addPatient(name) {
-            if (!name.trim()) return;
-            const newPatient = {
-                id: generateId(),
-                name: name.trim(),
-                medicines: []
-            };
-            appData.patients.push(newPatient);
-            saveData();
-            renderPatients();
-            switchScreen(screenPatients);
-            newPatientNameInput.value = '';
-        }
-
-        function addMedicine(patientId, name, doses, remaining, lastChecked) {
-            if (!name.trim()) return;
-            const patient = appData.patients.find(p => p.id === patientId);
-            if (!patient) return;
-
-            const newMed = {
-                id: generateId(),
-                name: name.trim(),
-                doses: parseFloat(doses) || 1,
-                remaining: parseFloat(remaining) || 0,
-                lastChecked: lastChecked || formatDate(new Date())
-            };
-            patient.medicines.push(newMed);
-            saveData();
-            renderMedicines(patientId);
-            switchScreen(screenMeds);
-        }
-
-        // --- Escape HTML ---
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // --- Event Listeners & Init ---
-
+        // --- Event Listeners ---
         function init() {
             loadData();
             renderPatients();
 
-            // Set default date for medicine form to today
-            if (medDateInput) {
-                medDateInput.value = formatDate(new Date());
-            }
-
-            // Add patient button
+            // Add patient
             document.getElementById('add-patient-btn').addEventListener('click', () => {
-                newPatientNameInput.value = '';
-                switchScreen(popupAddPatient);
+                openPatientForm(null);
             });
 
-            // Cancel add patient
-            document.getElementById('cancel-add-patient').addEventListener('click', () => {
+            // Cancel patient form
+            document.getElementById('cancel-patient').addEventListener('click', () => {
+                editingPatientId = null;
                 switchScreen(screenPatients);
             });
 
             // Save patient
-            document.getElementById('save-patient').addEventListener('click', () => {
-                addPatient(newPatientNameInput.value);
-            });
+            document.getElementById('save-patient').addEventListener('click', savePatient);
 
-            // Back to patients from meds
+            // Back from meds to patients
             document.getElementById('back-to-patients').addEventListener('click', () => {
                 currentPatientId = null;
-                switchScreen(screenPatients);
                 renderPatients();
+                switchScreen(screenPatients);
             });
 
-            // Add medicine button
+            // Add medicine
             document.getElementById('add-med-btn').addEventListener('click', () => {
                 if (!currentPatientId) return;
-                // Reset form
-                medNameInput.value = '';
-                medDosesInput.value = '2';
-                medRemainingInput.value = '10';
-                medDateInput.value = formatDate(new Date());
-                switchScreen(popupAddMed);
+                openMedicineForm(currentPatientId, null);
             });
 
-            // Cancel add medicine
-            document.getElementById('cancel-add-med').addEventListener('click', () => {
+            // Cancel medicine form
+            document.getElementById('cancel-med').addEventListener('click', () => {
+                editingMedicineId = null;
                 switchScreen(screenMeds);
             });
 
             // Save medicine
-            document.getElementById('save-med').addEventListener('click', () => {
-                if (!currentPatientId) return;
-                addMedicine(
-                    currentPatientId,
-                    medNameInput.value,
-                    medDosesInput.value,
-                    medRemainingInput.value,
-                    medDateInput.value
-                );
-            });
+            document.getElementById('save-med').addEventListener('click', saveMedicine);
 
-            // Prevent accidental form submission on Enter (optional)
+            // Prevent Enter key from submitting inputs
             document.querySelectorAll('input').forEach(input => {
                 input.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') e.preventDefault();
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        // Trigger the active screen's save action for convenience
+                        if (popupPatient.classList.contains('active')) savePatient();
+                        else if (popupMed.classList.contains('active')) saveMedicine();
+                    }
                 });
             });
         }
 
-        // Start the app
         init();
     })();
 </script>
