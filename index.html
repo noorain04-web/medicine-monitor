@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MediTrack · Home Quantity Monitor</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: #f2f5f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 12px;
+        }
+        .app-container {
+            width: 100%;
+            max-width: 420px;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            height: 700px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .screen {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            padding: 20px 18px;
+            overflow-y: auto;
+        }
+        .screen.active {
+            display: flex;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #0b2b4a;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 26px;
+            cursor: pointer;
+            color: #2c6e9c;
+            padding: 0 6px 0 0;
+            line-height: 1;
+        }
+        .patient-list, .med-list {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 12px;
+        }
+        .list-item {
+            background: #f8fafd;
+            border-radius: 18px;
+            padding: 16px 18px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+            border: 1px solid #e9eef4;
+            transition: 0.15s;
+        }
+        .list-item:active {
+            background: #e9f0f7;
+        }
+        .patient-name {
+            font-weight: 500;
+            font-size: 18px;
+            color: #1a3b5c;
+            flex: 1;
+        }
+        .patient-name span {
+            font-size: 14px;
+            font-weight: 400;
+            color: #6b7f94;
+            margin-left: 8px;
+        }
+        .delete-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #b22234;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 30px;
+        }
+        .add-btn {
+            background: #1e6f9f;
+            color: white;
+            border: none;
+            border-radius: 40px;
+            padding: 16px;
+            font-size: 18px;
+            font-weight: 500;
+            width: 100%;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(30, 111, 159, 0.3);
+            margin-top: 8px;
+        }
+        .add-btn:active {
+            background: #155a82;
+        }
+        .medicine-card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 16px;
+            margin-bottom: 14px;
+            border: 1px solid #dfe7ef;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.02);
+            position: relative;
+        }
+        .med-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        .med-name {
+            font-weight: 600;
+            font-size: 18px;
+            color: #0b2b4a;
+        }
+        .delete-med {
+            background: none;
+            border: none;
+            font-size: 18px;
+            color: #b22234;
+            cursor: pointer;
+            padding: 0 0 0 8px;
+        }
+        .med-detail {
+            font-size: 14px;
+            color: #3e5a73;
+            margin: 6px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .med-detail strong {
+            color: #1a3b5c;
+        }
+        .alert {
+            font-size: 13px;
+            font-weight: 600;
+            padding: 10px 12px;
+            border-radius: 14px;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .alert.red {
+            background: #ffe6e6;
+            color: #b22234;
+            border-left: 5px solid #b22234;
+        }
+        .alert.orange {
+            background: #fff0db;
+            color: #b85e00;
+            border-left: 5px solid #e68a00;
+        }
+        .alert.green {
+            background: #e3f2e9;
+            color: #1e6f3f;
+            border-left: 5px solid #1e6f3f;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #2c3e50;
+            margin-bottom: 6px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid #ccd9e6;
+            border-radius: 18px;
+            font-size: 16px;
+            background: #fafcff;
+            outline: none;
+        }
+        .form-group input:focus {
+            border-color: #1e6f9f;
+            background: white;
+        }
+        .btn-row {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-row button {
+            flex: 1;
+            padding: 14px;
+            border-radius: 40px;
+            font-size: 16px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: #1e6f9f;
+            color: white;
+        }
+        .btn-secondary {
+            background: #e9eef4;
+            color: #1a3b5c;
+        }
+        .empty-msg {
+            text-align: center;
+            color: #8a9aa8;
+            padding: 40px 0;
+            font-style: italic;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- SCREEN 1: Patient List -->
+    <div id="screen-patients" class="screen active">
+        <h2>🏠 Patients</h2>
+        <div id="patient-list-container" class="patient-list"></div>
+        <button id="add-patient-btn" class="add-btn">➕ Add Patient</button>
+    </div>
+
+    <!-- SCREEN 2: Medicine List for Selected Patient -->
+    <div id="screen-meds" class="screen">
+        <h2>
+            <button id="back-to-patients" class="back-btn">←</button>
+            <span id="patient-title">Medicines</span>
+        </h2>
+        <div id="med-list-container" class="med-list"></div>
+        <button id="add-med-btn" class="add-btn">➕ Add Medicine</button>
+    </div>
+
+    <!-- POPUP: Add Patient (Inline, simple) -->
+    <div id="popup-add-patient" class="screen" style="justify-content: center;">
+        <h2>New Patient</h2>
+        <div class="form-group">
+            <label>Patient First Name</label>
+            <input type="text" id="new-patient-name" placeholder="e.g., Dad" autocomplete="off">
+        </div>
+        <div class="btn-row">
+            <button id="cancel-add-patient" class="btn-secondary">Cancel</button>
+            <button id="save-patient" class="btn-primary">Save</button>
+        </div>
+    </div>
+
+    <!-- POPUP: Add Medicine -->
+    <div id="popup-add-med" class="screen" style="justify-content: flex-start; padding-top: 10px;">
+        <h2>New Medicine</h2>
+        <div class="form-group">
+            <label>Medicine Name</label>
+            <input type="text" id="med-name" placeholder="e.g., Metformin 500mg" autocomplete="off">
+        </div>
+        <div class="form-group">
+            <label>Doses per day (tablets/capsules)</label>
+            <input type="number" id="med-doses" value="2" min="0.5" step="0.5">
+        </div>
+        <div class="form-group">
+            <label>Remaining Quantity (as of today)</label>
+            <input type="number" id="med-remaining" value="10" min="0" step="1">
+        </div>
+        <div class="form-group">
+            <label>Date Checked (last refill/count)</label>
+            <input type="date" id="med-date">
+        </div>
+        <div class="btn-row">
+            <button id="cancel-add-med" class="btn-secondary">Cancel</button>
+            <button id="save-med" class="btn-primary">Save</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // --- Data Layer ---
+        const STORAGE_KEY = 'mediTrackData';
+
+        // Initialize data structure
+        let appData = {
+            patients: []
+        };
+
+        // Load from localStorage
+        function loadData() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    appData = JSON.parse(stored);
+                } catch (e) {
+                    console.error('Failed to parse data', e);
+                    appData = { patients: [] };
+                }
+            } else {
+                // Seed with a sample patient for demo (optional)
+                appData = {
+                    patients: [
+                        { id: 'p1', name: 'Dad', medicines: [] },
+                        { id: 'p2', name: 'Mom', medicines: [] }
+                    ]
+                };
+                saveData();
+            }
+            // Ensure each patient has a medicines array
+            appData.patients.forEach(p => { if (!p.medicines) p.medicines = []; });
+        }
+
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+        }
+
+        // --- State ---
+        let currentPatientId = null;
+
+        // --- DOM Elements ---
+        const screenPatients = document.getElementById('screen-patients');
+        const screenMeds = document.getElementById('screen-meds');
+        const popupAddPatient = document.getElementById('popup-add-patient');
+        const popupAddMed = document.getElementById('popup-add-med');
+        const patientListContainer = document.getElementById('patient-list-container');
+        const medListContainer = document.getElementById('med-list-container');
+        const patientTitle = document.getElementById('patient-title');
+        const newPatientNameInput = document.getElementById('new-patient-name');
+
+        // Medicine form fields
+        const medNameInput = document.getElementById('med-name');
+        const medDosesInput = document.getElementById('med-doses');
+        const medRemainingInput = document.getElementById('med-remaining');
+        const medDateInput = document.getElementById('med-date');
+
+        // --- Utility Functions ---
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+        }
+
+        function switchScreen(screen) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            screen.classList.add('active');
+        }
+
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        // Calculate days remaining and end date based on doses
+        function calculateMedicineStats(med) {
+            const doses = parseFloat(med.doses) || 0;
+            const remaining = parseFloat(med.remaining) || 0;
+            const lastChecked = med.lastChecked || formatDate(new Date());
+
+            if (doses <= 0) return { daysLeft: Infinity, endDate: null, isFinished: remaining <= 0 };
+
+            // How many days the remaining stock will last
+            const daysLeft = Math.floor(remaining / doses); // integer days
+            const isFinished = remaining <= 0;
+
+            // Calculate end date (approx)
+            const checkedDate = new Date(lastChecked);
+            const endDate = new Date(checkedDate);
+            endDate.setDate(endDate.getDate() + daysLeft);
+
+            return {
+                daysLeft: daysLeft,
+                endDate: endDate,
+                isFinished: isFinished,
+                rawRemaining: remaining,
+                rawDoses: doses
+            };
+        }
+
+        // --- Render Functions ---
+
+        function renderPatients() {
+            if (appData.patients.length === 0) {
+                patientListContainer.innerHTML = '<div class="empty-msg">No patients yet. Add one below.</div>';
+                return;
+            }
+
+            patientListContainer.innerHTML = appData.patients.map(patient => {
+                const medCount = patient.medicines ? patient.medicines.length : 0;
+                return `
+                    <div class="list-item" data-patient-id="${patient.id}">
+                        <div class="patient-name">${escapeHtml(patient.name)} <span>(${medCount})</span></div>
+                        <button class="delete-btn" data-patient-id="${patient.id}" title="Delete patient">✕</button>
+                    </div>
+                `;
+            }).join('');
+
+            // Attach click listeners to patient rows (excluding delete button)
+            document.querySelectorAll('.list-item[data-patient-id]').forEach(row => {
+                row.addEventListener('click', (e) => {
+                    // If clicked on delete button, ignore here (handled separately)
+                    if (e.target.classList.contains('delete-btn')) return;
+                    const pid = row.dataset.patientId;
+                    openPatientMeds(pid);
+                });
+            });
+
+            // Attach delete listeners
+            document.querySelectorAll('.delete-btn[data-patient-id]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const pid = btn.dataset.patientId;
+                    deletePatient(pid);
+                });
+            });
+        }
+
+        function renderMedicines(patientId) {
+            const patient = appData.patients.find(p => p.id === patientId);
+            if (!patient) return;
+
+            patientTitle.textContent = escapeHtml(patient.name) + "'s Meds";
+            const meds = patient.medicines || [];
+
+            if (meds.length === 0) {
+                medListContainer.innerHTML = '<div class="empty-msg">No medicines added yet.</div>';
+                return;
+            }
+
+            medListContainer.innerHTML = meds.map(med => {
+                const stats = calculateMedicineStats(med);
+                let alertClass = 'green';
+                let alertText = '✅ Sufficient stock';
+
+                if (stats.isFinished || stats.rawRemaining <= 0) {
+                    alertClass = 'red';
+                    alertText = '⚠️ FINISHED! Restock immediately.';
+                } else if (stats.daysLeft <= 3) {
+                    alertClass = 'orange';
+                    alertText = `⚠️ Low stock: ~${stats.daysLeft} day(s) left. Order soon.`;
+                } else {
+                    alertText = `✅ Good. ~${stats.daysLeft} day(s) remaining.`;
+                }
+
+                const endDateStr = stats.endDate ? formatDate(stats.endDate) : '—';
+                const lastCheckedStr = med.lastChecked || 'not set';
+
+                return `
+                    <div class="medicine-card" data-med-id="${med.id}">
+                        <div class="med-header">
+                            <div class="med-name">${escapeHtml(med.name)}</div>
+                            <button class="delete-med" data-med-id="${med.id}" data-patient-id="${patientId}">✕</button>
+                        </div>
+                        <div class="med-detail"><span>Doses/day:</span> <strong>${med.doses}</strong></div>
+                        <div class="med-detail"><span>Remaining:</span> <strong>${med.remaining}</strong> (checked: ${lastCheckedStr})</div>
+                        <div class="med-detail"><span>Est. end date:</span> <strong>${endDateStr}</strong></div>
+                        <div class="alert ${alertClass}">${alertText}</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Attach delete listeners for medicines
+            document.querySelectorAll('.delete-med').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const medId = btn.dataset.medId;
+                    const pid = btn.dataset.patientId;
+                    deleteMedicine(pid, medId);
+                });
+            });
+        }
+
+        // --- Actions ---
+
+        function openPatientMeds(patientId) {
+            currentPatientId = patientId;
+            renderMedicines(patientId);
+            switchScreen(screenMeds);
+        }
+
+        function deletePatient(patientId) {
+            if (!confirm('Delete this patient and all their medicines?')) return;
+            appData.patients = appData.patients.filter(p => p.id !== patientId);
+            saveData();
+            renderPatients();
+            // If we were viewing this patient's meds, go back
+            if (currentPatientId === patientId) {
+                currentPatientId = null;
+                switchScreen(screenPatients);
+            }
+        }
+
+        function deleteMedicine(patientId, medId) {
+            if (!confirm('Delete this medicine entry?')) return;
+            const patient = appData.patients.find(p => p.id === patientId);
+            if (patient) {
+                patient.medicines = patient.medicines.filter(m => m.id !== medId);
+                saveData();
+                renderMedicines(patientId);
+            }
+        }
+
+        function addPatient(name) {
+            if (!name.trim()) return;
+            const newPatient = {
+                id: generateId(),
+                name: name.trim(),
+                medicines: []
+            };
+            appData.patients.push(newPatient);
+            saveData();
+            renderPatients();
+            switchScreen(screenPatients);
+            newPatientNameInput.value = '';
+        }
+
+        function addMedicine(patientId, name, doses, remaining, lastChecked) {
+            if (!name.trim()) return;
+            const patient = appData.patients.find(p => p.id === patientId);
+            if (!patient) return;
+
+            const newMed = {
+                id: generateId(),
+                name: name.trim(),
+                doses: parseFloat(doses) || 1,
+                remaining: parseFloat(remaining) || 0,
+                lastChecked: lastChecked || formatDate(new Date())
+            };
+            patient.medicines.push(newMed);
+            saveData();
+            renderMedicines(patientId);
+            switchScreen(screenMeds);
+        }
+
+        // --- Escape HTML ---
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // --- Event Listeners & Init ---
+
+        function init() {
+            loadData();
+            renderPatients();
+
+            // Set default date for medicine form to today
+            if (medDateInput) {
+                medDateInput.value = formatDate(new Date());
+            }
+
+            // Add patient button
+            document.getElementById('add-patient-btn').addEventListener('click', () => {
+                newPatientNameInput.value = '';
+                switchScreen(popupAddPatient);
+            });
+
+            // Cancel add patient
+            document.getElementById('cancel-add-patient').addEventListener('click', () => {
+                switchScreen(screenPatients);
+            });
+
+            // Save patient
+            document.getElementById('save-patient').addEventListener('click', () => {
+                addPatient(newPatientNameInput.value);
+            });
+
+            // Back to patients from meds
+            document.getElementById('back-to-patients').addEventListener('click', () => {
+                currentPatientId = null;
+                switchScreen(screenPatients);
+                renderPatients();
+            });
+
+            // Add medicine button
+            document.getElementById('add-med-btn').addEventListener('click', () => {
+                if (!currentPatientId) return;
+                // Reset form
+                medNameInput.value = '';
+                medDosesInput.value = '2';
+                medRemainingInput.value = '10';
+                medDateInput.value = formatDate(new Date());
+                switchScreen(popupAddMed);
+            });
+
+            // Cancel add medicine
+            document.getElementById('cancel-add-med').addEventListener('click', () => {
+                switchScreen(screenMeds);
+            });
+
+            // Save medicine
+            document.getElementById('save-med').addEventListener('click', () => {
+                if (!currentPatientId) return;
+                addMedicine(
+                    currentPatientId,
+                    medNameInput.value,
+                    medDosesInput.value,
+                    medRemainingInput.value,
+                    medDateInput.value
+                );
+            });
+
+            // Prevent accidental form submission on Enter (optional)
+            document.querySelectorAll('input').forEach(input => {
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') e.preventDefault();
+                });
+            });
+        }
+
+        // Start the app
+        init();
+    })();
+</script>
+</body>
+</html>
